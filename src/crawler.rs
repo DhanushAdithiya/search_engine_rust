@@ -1,20 +1,21 @@
 use reqwest;
 use scraper::{self, html, Html, Selector};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::thread;
 use std::time::Duration;
 use url;
 
-use crate::text_processing::{self, stop_word_removal};
+use crate::text_processing::stop_word_removal;
 
 //TODO
 // add a robots.txt implementaion
 // implement a delay
 // storing and indexing
 
-pub async fn crawl_sites(starting_url: String, max_pages: usize) {
+pub async fn crawl_sites(starting_url: String, max_pages: usize) -> HashMap<String, String> {
     let mut queue: Vec<String> = Vec::new();
     let mut visited: HashSet<String> = HashSet::new(); //Hash prevents duplicates
+    let mut data: HashMap<String, String> = HashMap::new();
 
     queue.push(starting_url);
 
@@ -27,6 +28,7 @@ pub async fn crawl_sites(starting_url: String, max_pages: usize) {
 
         visited.insert(current_url.clone());
         if let Ok((page_content, clean)) = fetch_page_content(&current_url).await {
+            data.insert(current_url, clean);
             if let Ok(urls) = fetch_url(page_content, max_pages - visited.len()).await {
                 for url in urls {
                     if !visited.contains(&url) {
@@ -34,7 +36,7 @@ pub async fn crawl_sites(starting_url: String, max_pages: usize) {
                     }
                 }
             } else {
-                eprintln!("Error while fetching URLs from page: {}", current_url);
+                eprintln!("Error while fetching URLs from page:")
             }
         } else {
             eprintln!("THERE WAS AN ERROR CRAWLLING ")
@@ -47,7 +49,7 @@ pub async fn crawl_sites(starting_url: String, max_pages: usize) {
         );
     }
 
-    println!("{:?}", visited);
+    data
 }
 
 async fn fetch_page_content(url: &String) -> Result<(String, String), reqwest::Error> {
@@ -65,8 +67,9 @@ async fn fetch_page_content(url: &String) -> Result<(String, String), reqwest::E
         "",
     );
     let clean_text = stop_word_removal(clean_puncuations);
-    println!("{:?}", clean_text);
     Ok((content, clean_text))
+
+    //Send the url + the clean string to the tf-idf function;
 }
 
 async fn fetch_url(content: String, max: usize) -> Result<Vec<String>, reqwest::Error> {
